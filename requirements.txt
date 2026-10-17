@@ -1,5 +1,5 @@
-yfinance
-pandas
-numpy
-requests
-jupyterlab
+yfinance==1.7.0
+pandas==2.1.2
+numpy==1.23.5
+requests==2.31.0
+matplotlib==3.8.0

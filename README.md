@@ -1,98 +1,78 @@
 # Market Signal Lab
 
-Rule-based market strategy research with Python, historical backtesting, and a Discord alert prototype.
+Python research project exploring the return/drawdown tradeoff of EMA trend filters, RSI/ATR pullback entries, and volatility-based position sizing. Includes a runnable daily backtest and an archive of earlier experiments with optional Discord alerts.
 
-## Overview
+![QQQ strategy performance](results/qqq-daily/performance.png)
 
-This project explores a practical research question: how do trend filters, pullback entries, and volatility-aware exposure affect the tradeoff between return and drawdown?
+## Example result
 
-The experimental notebook studies QQQ across intraday, hourly, and daily timeframes, with additional QQQ/TQQQ allocation experiments. It also includes a polling-based Discord alert prototype for VOO, QQQ, and TSLA.
+Daily adjusted QQQ prices, January 4, 2021–December 31, 2025. Downloaded October 17, 2026. Both portfolios include a 0.1% one-way transaction-cost approximation; cash earns zero interest.
 
-This is an exploratory research project. It does not train a machine learning model or predict future prices, and it does not execute brokerage orders.
+| Portfolio | Total return | Maximum drawdown |
+|---|---:|---:|
+| EMA/RSI/ATR strategy | 55.05% | -14.26% |
+| QQQ buy and hold | 104.45% | -35.12% |
 
-## Implemented experiments
+The strategy reduced historical drawdown but captured less upside. These results are exploratory and are not held-out evidence of future performance. The new runner uses explicit timing and warm-up conventions, so results differ from the archived notebook.
 
-- EMA trend filters using several lookback periods.
-- RSI and ATR pullback entry rules.
-- Strategy equity curves, total return, and maximum drawdown calculations.
-- Comparisons against QQQ buy-and-hold.
-- A volatility-ratio rule that selects 50% or 100% exposure on qualifying entries.
-- A proportional transaction-cost approximation in the V12 experiment.
-- A grid search over TQQQ allocations during periods outside the primary QQQ strategy.
-- Discord webhook alerts with an in-memory per-symbol cooldown.
+## Run it
 
-## Recorded findings
-
-The original notebook contains exploratory results showing that several strategies reduced drawdown while also giving up substantial upside. This motivated experiments with entry thresholds, holding rules, and exposure sizing.
-
-These are observations from the supplied notebook, not independently reproduced performance claims. The original runs use rolling date windows and do not save the underlying price snapshots or exact execution dates. A fresh download may produce different results.
-
-## Project layout
-
-```text
-market-signal-lab/
-  notebooks/
-    strategy_experiments.ipynb
-  requirements.txt
-  .env.example
-  .gitignore
-  README.md
-  PROJECT_DESCRIPTION.md
-```
-
-## Local setup
-
-Use Python 3.10 or newer as a starting environment; compatibility has not yet been verified.
-
-```bash
-python -m venv .venv
-# Windows PowerShell
-.venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
-jupyter lab notebooks/strategy_experiments.ipynb
-```
-
-Dependencies are currently unpinned. A tested lockfile is future work.
-
-Run individual backtest experiments selectively. The first code cell starts a continuous polling loop when executed; interrupt it before moving to other cells. Some cells redefine functions, so run the imports and definitions belonging to the experiment you select.
-
-Historical data is downloaded through yfinance and requires network access. Availability of intraday history depends on the provider.
-
-### Optional Discord alerts
-
-Set the environment variable before launching Jupyter:
+Tested locally with Python 3.11. No Discord account or webhook is needed.
 
 ```powershell
-$env:DISCORD_WEBHOOK_URL = "your_webhook_url"
+python -m venv .venv
+.venv\Scripts\Activate.ps1
+python -m pip install -r requirements.txt
+python -m market_signal_lab --ticker QQQ --start 2021-01-01 --end 2026-01-01
+```
+
+The default output folder is `results/`. Each run saves the downloaded prices (including warm-up history), daily backtest calculations, a JSON summary with dates and parameters, and a performance chart. The end date is exclusive. Downloading requires network access.
+
+Reproduce the example using the saved price snapshot, without downloading again:
+
+```powershell
+python -m market_signal_lab --csv results/qqq-daily/prices.csv --start 2021-01-01 --end 2026-01-01 --output results/reproduced
+python -m unittest discover -s tests -v
+```
+
+Direct dependencies are pinned to the local validation environment; a complete cross-platform lockfile is not provided.
+
+## Strategy and accounting
+
+- Compute EMA(50), EMA(200), RSI(3), ATR(14), and the 20-bar rolling high.
+- Enter above EMA(200) when RSI is below 30 or price is more than 1.5 ATR below the rolling high.
+- Select 50% exposure when normalized ATR is above 1.2 times its trailing average; otherwise select 100%. Exposure can change on subsequent qualifying entries.
+- Exit below EMA(50); an exit takes precedence over an entry.
+- Require 200 prior bars to warm up the EMA. Each evaluation starts in cash.
+- A signal at close t first affects the return from close t+1 to close t+2. This conservative two-bar lag avoids crediting the next full bar to an unavailable fill, but remains a close-to-close approximation rather than a next-open execution model.
+- Charge `--cost` times the absolute change in exposure. Buy-and-hold pays its entry cost. No terminal liquidation is charged to either portfolio.
+
+## Files
+
+```text
+market_signal_lab/
+  indicators.py           # Shared indicator calculations
+  backtest.py             # Signals, exposure, costs, and metrics
+  __main__.py             # Command-line runner and chart export
+notebooks/strategy_experiments.ipynb  # Earlier experimental versions
+results/qqq-daily/         # Dated example inputs and generated results
+tests/                    # Future-data invariance, timing/costs, warm-up checks
+.github/workflows/        # Automated Python tests
+```
+
+## Original notebook and optional alerts
+
+```powershell
+python -m pip install -r requirements-notebook.txt
 jupyter lab notebooks/strategy_experiments.ipynb
 ```
 
-`.env.example` documents the variable only; this project does not automatically load `.env` files. The alert cell sends messages when its conditions are satisfied. Use a dedicated test channel.
+The notebook preserves earlier intraday/hourly/daily strategies and QQQ/TQQQ allocation experiments. Run experiments selectively: cells redefine functions, and the first cell starts a continuous polling loop. This archive has not been rerun or audited end-to-end.
 
-## Research limitations
+Only the alert prototype needs `DISCORD_WEBHOOK_URL`. Set it in the environment before launching Jupyter; `.env.example` is documentation, not an automatically loaded file. Never commit a real webhook. The alert prototype retains basic in-memory cooldowns and does not execute broker orders.
 
-- Repeated parameter tuning uses overlapping historical windows; there is no held-out evaluation or walk-forward validation.
-- Shifted positions provide a basic timing convention, but realistic next-open fills, spreads, and order execution are not modeled.
-- Transaction costs are included only in a subset of experiments. Results across versions are not a controlled comparison.
-- Indicator warm-up periods are not consistently excluded from evaluation.
-- Mixed daily/intraday experiments require a separate timestamp-alignment and look-ahead-bias audit.
-- The TQQQ allocation search assumes a constant annual cash rate and omits trading costs; it does not establish an optimal future allocation.
-- Volatility-based exposure is a heuristic, not portfolio risk parity.
-- Alert position sizing is based on stop distance and does not cap shares by available cash.
-- The alert prototype uses temporary cooldown state, has limited delivery/error handling, and may process an unfinished price bar.
-- Historical data and a reproducible execution environment are not bundled.
+## Limitations and next steps
 
-## Next steps
+This is rule-based research, not a trained price prediction model. Repeated tuning in the original notebook used overlapping periods; the published example is retrospective, not a held-out test. Daily adjusted prices can be revised by the provider. Execution omits spreads, next-open fills, taxes, and cash interest. Volatility sizing is a heuristic, not risk parity.
 
-1. Separate indicators, strategy rules, evaluation, and alerts into modules.
-2. Save dated input data and explicit experiment configurations.
-3. Add consistent costs, execution assumptions, and warm-up handling.
-4. Evaluate on held-out periods and additional symbols.
-5. Add equity/drawdown charts and tests for position timing and accounting.
-6. Make alerts optional, cash-constrained, and resilient to delivery failures.
-
-## Publication notes
-
-The notebook copy has had outputs cleared and the embedded Discord webhook replaced with an environment-variable lookup. Rotate the original webhook before publishing. If it was previously committed, removing it from the current file does not remove it from repository history.
-
-The supplied notebook has been preserved as an experimental archive rather than presented as a production trading system. Code has not been executed or performance independently verified during this packaging pass.
+The legacy mixed-timeframe notebook still needs a timestamp/look-ahead audit. Its alert sizing is not cash-capped, and delivery handling remains basic. Next steps are walk-forward evaluation, additional symbols and regimes, and improved optional alerts.
