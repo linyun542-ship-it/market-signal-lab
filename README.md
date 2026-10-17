@@ -1,8 +1,18 @@
 # Market Signal Lab
 
+![QQQ equity curves and drawdowns](results/qqq-daily/performance.png)
+
 Python research project exploring the return/drawdown tradeoff of EMA trend filters, RSI/ATR pullback entries, and volatility-based position sizing. Includes a runnable daily backtest and an archive of earlier experiments with optional Discord alerts.
 
-![QQQ strategy performance](results/qqq-daily/performance.png)
+### Annual returns
+
+![Calendar-year compounded returns: strategy versus QQQ](results/qqq-daily/annual_returns.png)
+
+### Monthly strategy returns
+
+![Monthly compounded strategy returns](results/qqq-daily/monthly_returns.png)
+
+All three charts use the same saved 2021–2025 backtest, including modeled costs. Returns compound daily returns; partial calendar periods in custom runs are not annualized.
 
 ## Example result
 
@@ -76,3 +86,4 @@ Only the alert prototype needs `DISCORD_WEBHOOK_URL`. Set it in the environment 
 This is rule-based research, not a trained price prediction model. Repeated tuning in the original notebook used overlapping periods; the published example is retrospective, not a held-out test. Daily adjusted prices can be revised by the provider. Execution omits spreads, next-open fills, taxes, and cash interest. Volatility sizing is a heuristic, not risk parity.
 
 The legacy mixed-timeframe notebook still needs a timestamp/look-ahead audit. Its alert sizing is not cash-capped, and delivery handling remains basic. Next steps are walk-forward evaluation, additional symbols and regimes, and improved optional alerts.
+

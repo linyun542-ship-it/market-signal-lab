@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 
 from .backtest import simulate
+from .charts import report_charts
 
 
 def main():
@@ -51,8 +52,10 @@ def main():
     for ax in axes:
         ax.legend(); ax.grid(alpha=0.2)
     fig.tight_layout(); fig.savefig(args.output/"performance.png", dpi=160); plt.close(fig)
+    report_charts(frame, args.output, args.ticker)
     print(json.dumps(report, indent=2))
 
 
 if __name__ == "__main__":
     main()
+
